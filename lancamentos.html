@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Lançamentos</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+    h2 { margin-top: 30px; }
+    input, button { padding: 8px; margin: 5px 0; width: 100%; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+    .section { background: #fff; padding: 15px; margin-top: 20px; border-radius: 8px; }
+    button { width: auto; padding: 8px 12px; }
+  </style>
+</head>
+<body>
+
+  <h1>Lançamentos</h1>
+
+  <div class="section">
+    <h2>Saldo Anterior</h2>
+    <input type="number" id="saldoAnterior" placeholder="Digite o saldo anterior" step="0.01" />
+    <button onclick="salvarSaldoAnterior()">Salvar Saldo</button>
+  </div>
+
+  <div class="section">
+    <h2>Despesas</h2>
+    <input type="text" id="descDespesa" placeholder="Descrição da Despesa" />
+    <input type="number" id="valorDespesa" placeholder="Valor (R$)" step="0.01" />
+    <button onclick="adicionarDespesa()">Adicionar Despesa</button>
+    <table>
+      <thead>
+        <tr><th>Descrição</th><th>Valor (R$)</th><th>Ações</th></tr>
+      </thead>
+      <tbody id="tabelaDespesas"></tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Saques de Partilha</h2>
+    <label>Benedito</label>
+    <input type="number" id="benedito" placeholder="Saque de Benedito (R$)" step="0.01" />
+    <label>José</label>
+    <input type="number" id="jose" placeholder="Saque de José (R$)" step="0.01" />
+    <label>Pedro</label>
+    <input type="number" id="pedro" placeholder="Saque de Pedro (R$)" step="0.01" />
+    <button onclick="salvarSaques()">Salvar Saques</button>
+  </div>
+
+  <script>
+    // Carregar valores existentes
+    document.getElementById('saldoAnterior').value = localStorage.getItem('saldoAnterior') || '';
+    document.getElementById('benedito').value = localStorage.getItem('saqueBenedito') || '';
+    document.getElementById('jose').value = localStorage.getItem('saqueJose') || '';
+    document.getElementById('pedro').value = localStorage.getItem('saquePedro') || '';
+
+    const despesas = JSON.parse(localStorage.getItem('despesas')) || [];
+    atualizarTabelaDespesas();
+
+    function salvarSaldoAnterior() {
+      const valor = parseFloat(document.getElementById('saldoAnterior').value);
+      if (isNaN(valor)) return alert('Digite um valor válido.');
+      localStorage.setItem('saldoAnterior', valor);
+      alert('Saldo salvo!');
+    }
+
+    function adicionarDespesa() {
+      const descricao = document.getElementById('descDespesa').value.trim();
+      const valor = parseFloat(document.getElementById('valorDespesa').value);
+
+      if (!descricao || isNaN(valor)) {
+        alert('Preencha os campos corretamente.');
+        return;
+      }
+
+      despesas.push({ descricao, valor });
+      localStorage.setItem('despesas', JSON.stringify(despesas));
+      document.getElementById('descDespesa').value = '';
+      document.getElementById('valorDespesa').value = '';
+      atualizarTabelaDespesas();
+    }
+
+    function excluirDespesa(index) {
+      if (!confirm("Excluir esta despesa?")) return;
+      despesas.splice(index, 1);
+      localStorage.setItem('despesas', JSON.stringify(despesas));
+      atualizarTabelaDespesas();
+    }
+
+    function atualizarTabelaDespesas() {
+      const tbody = document.getElementById('tabelaDespesas');
+      tbody.innerHTML = '';
+      despesas.forEach((d, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${d.descricao}</td>
+          <td>R$ ${parseFloat(d.valor).toFixed(2)}</td>
+          <td><button onclick="excluirDespesa(${i})">🗑️</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function salvarSaques() {
+      const b = parseFloat(document.getElementById('benedito').value) || 0;
+      const j = parseFloat(document.getElementById('jose').value) || 0;
+      const p = parseFloat(document.getElementById('pedro').value) || 0;
+
+      localStorage.setItem('saqueBenedito', b);
+      localStorage.setItem('saqueJose', j);
+      localStorage.setItem('saquePedro', p);
+      alert('Saques salvos!');
+    }
+  </script>
+
+</body>
+</html>

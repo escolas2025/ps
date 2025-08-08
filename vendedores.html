@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lista de Vendedores e Histórico</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9; }
+  h2 { margin-top: 20px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+  th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+  .vendedor-item { cursor: pointer; background: #fff; border: 1px solid #ccc; padding: 8px; margin-bottom: 6px; }
+  .vendedor-item:hover { background: #e0e0e0; }
+  button.small { padding: 4px 8px; margin: 0 2px; }
+  .hidden { display: none; }
+  #botoesExport { margin-top: 15px; }
+  #botoesExport button { margin-right: 10px; padding: 8px 12px; }
+</style>
+</head>
+<body>
+
+<h2>Vendedores Cadastrados</h2>
+<div id="listaVendedores"></div>
+
+<div id="detalhesVendedor" class="hidden">
+  <hr />
+  <div id="conteudoExportacao">
+    <h2 id="tituloVendedor"></h2>
+    <table id="tabelaVendas">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Bloco</th>
+          <th>Pegou</th>
+          <th>Devolveu</th>
+          <th>Vendidas</th>
+          <th>Apurado (R$)</th>
+          <th>Pago (R$)</th>
+          <th>Devendo (R$)</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="tbodyVendas"></tbody>
+      <tfoot id="tfootTotais"></tfoot>
+    </table>
+  </div>
+
+  <div id="botoesExport">
+    <button onclick="exportarPDF()">Exportar PDF</button>
+    <button onclick="exportarJPG()">Exportar JPG</button>
+  </div>
+
+  <h3>Adicionar / Editar Venda</h3>
+  <input type="date" id="dataVenda" />
+  <input type="text" id="blocoVenda" placeholder="Bloco" />
+  <input type="number" id="pegouVenda" placeholder="Pegou" />
+  <input type="number" id="devolveuVenda" placeholder="Devolveu" />
+  <input type="number" id="pagoVenda" placeholder="Pago (R$)" step="0.01" />
+  <button onclick="salvarVenda()">Salvar Venda</button>
+  <button onclick="cancelarEdicao()" class="hidden" id="btnCancelar">Cancelar Edição</button>
+</div>
+
+<!-- Bibliotecas externas para export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script>
+  let vendedores = JSON.parse(localStorage.getItem('vendedores')) || [];
+  let vendedorSelecionado = null;
+  let vendaEditandoIndex = null;
+
+  function listarVendedores() {
+    const container = document.getElementById('listaVendedores');
+    container.innerHTML = '';
+    vendedores.forEach((v, i) => {
+      const div = document.createElement('div');
+      div.className = 'vendedor-item';
+      div.textContent = v.nome;
+      div.onclick = () => selecionarVendedor(i);
+      container.appendChild(div);
+    });
+  }
+
+  function selecionarVendedor(index) {
+    vendedorSelecionado = index;
+    vendaEditandoIndex = null;
+    document.getElementById('detalhesVendedor').classList.remove('hidden');
+    document.getElementById('tituloVendedor').textContent = `Vendedor: ${vendedores[index].nome} (Cotação: R$ ${vendedores[index].cotacao.toFixed(2)})`;
+    limparCamposVenda();
+    listarVendasTabela();
+    document.getElementById('btnCancelar').classList.add('hidden');
+  }
+
+  function listarVendasTabela() {
+    const tbody = document.getElementById('tbodyVendas');
+    const tfoot = document.getElementById('tfootTotais');
+    tbody.innerHTML = '';
+    tfoot.innerHTML = '';
+
+    const vendedor = vendedores[vendedorSelecionado];
+
+    let somaVendidas = 0;
+    let somaApurado = 0;
+    let somaPago = 0;
+    let somaDevendo = 0;
+
+    vendedor.vendas.forEach((venda, i) => {
+      const vendidas = venda.pegou - venda.devolveu;
+      const apurado = vendidas * vendedor.cotacao;
+      const devendo = apurado - venda.pago;
+
+      somaVendidas += vendidas;
+      somaApurado += apurado;
+      somaPago += venda.pago;
+      somaDevendo += devendo;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${venda.data}</td>
+        <td>${venda.bloco}</td>
+        <td>${venda.pegou}</td>
+        <td>${venda.devolveu}</td>
+        <td>${vendidas}</td>
+        <td>${apurado.toFixed(2)}</td>
+        <td>${venda.pago.toFixed(2)}</td>
+        <td>${devendo.toFixed(2)}</td>
+        <td>
+          <button class="small" onclick="editarVenda(${i})">✏️</button>
+          <button class="small" onclick="excluirVenda(${i})">🗑️</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tfoot.innerHTML = `
+      <tr style="font-weight:bold; background:#ddd;">
+        <td colspan="4">Totais</td>
+        <td>${somaVendidas}</td>
+        <td>${somaApurado.toFixed(2)}</td>
+        <td>${somaPago.toFixed(2)}</td>
+        <td>${somaDevendo.toFixed(2)}</td>
+        <td></td>
+      </tr>
+    `;
+  }
+
+  function limparCamposVenda() {
+    document.getElementById('dataVenda').value = '';
+    document.getElementById('blocoVenda').value = '';
+    document.getElementById('pegouVenda').value = '';
+    document.getElementById('devolveuVenda').value = '';
+    document.getElementById('pagoVenda').value = '';
+  }
+
+  function salvarVenda() {
+    if (vendedorSelecionado === null) {
+      alert('Selecione um vendedor antes de adicionar venda.');
+      return;
+    }
+
+    const data = document.getElementById('dataVenda').value;
+    const bloco = document.getElementById('blocoVenda').value.trim();
+    const pegou = parseInt(document.getElementById('pegouVenda').value);
+    const devolveu = parseInt(document.getElementById('devolveuVenda').value);
+    const pago = parseFloat(document.getElementById('pagoVenda').value);
+
+    if (!data || !bloco || isNaN(pegou) || isNaN(devolveu) || isNaN(pago)) {
+      alert('Preencha todos os campos corretamente.');
+      return;
+    }
+
+    const venda = { data, bloco, pegou, devolveu, pago };
+
+    if (vendaEditandoIndex !== null) {
+      vendedores[vendedorSelecionado].vendas[vendaEditandoIndex] = venda;
+      vendaEditandoIndex = null;
+      document.getElementById('btnCancelar').classList.add('hidden');
+    } else {
+      vendedores[vendedorSelecionado].vendas.push(venda);
+    }
+
+    localStorage.setItem('vendedores', JSON.stringify(vendedores));
+    listarVendasTabela();
+    limparCamposVenda();
+  }
+
+  function editarVenda(index) {
+    vendaEditandoIndex = index;
+    const venda = vendedores[vendedorSelecionado].vendas[index];
+    document.getElementById('dataVenda').value = venda.data;
+    document.getElementById('blocoVenda').value = venda.bloco;
+    document.getElementById('pegouVenda').value = venda.pegou;
+    document.getElementById('devolveuVenda').value = venda.devolveu;
+    document.getElementById('pagoVenda').value = venda.pago;
+    document.getElementById('btnCancelar').classList.remove('hidden');
+  }
+
+  function cancelarEdicao() {
+    vendaEditandoIndex = null;
+    limparCamposVenda();
+    document.getElementById('btnCancelar').classList.add('hidden');
+  }
+
+  function excluirVenda(index) {
+    if (!confirm('Tem certeza que deseja excluir essa venda?')) return;
+    vendedores[vendedorSelecionado].vendas.splice(index, 1);
+    localStorage.setItem('vendedores', JSON.stringify(vendedores));
+    listarVendasTabela();
+  }
+
+  // Exportar PDF com jsPDF
+  async function exportarPDF() {
+    if (vendedorSelecionado === null) {
+      alert('Selecione um vendedor para exportar.');
+      return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'pt', 'a4');
+    const conteudo = document.getElementById('conteudoExportacao');
+
+    await doc.html(conteudo, {
+      callback: function (doc) {
+        doc.save(`${vendedores[vendedorSelecionado].nome}_historico.pdf`);
+      },
+      margin: [20, 20, 20, 20],
+      autoPaging: 'text',
+      x: 10,
+      y: 10,
+      html2canvas: { scale: 0.6 }
+    });
+  }
+
+  // Exportar JPG com html2canvas
+  function exportarJPG() {
+    if (vendedorSelecionado === null) {
+      alert('Selecione um vendedor para exportar.');
+      return;
+    }
+
+    const conteudo = document.getElementById('conteudoExportacao');
+    html2canvas(conteudo).then(canvas => {
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+      const link = document.createElement('a');
+      link.href = imgData;
+      link.download = `${vendedores[vendedorSelecionado].nome}_historico.jpg`;
+      link.click();
+    });
+  }
+
+  listarVendedores();
+</script>
+
+</body>
+</html>

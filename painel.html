@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Painel de Controle</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    .painel {
+      text-align: center;
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+      width: 90%;
+      max-width: 400px;
+    }
+
+    .painel h1 {
+      margin-bottom: 30px;
+      color: #333;
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      margin: 10px 0;
+      padding: 15px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    .btn:hover {
+      opacity: 0.9;
+    }
+
+    .cadastro { background: #4CAF50; }
+    .vendedores { background: #2196F3; }
+    .caixa { background: #FF9800; }
+    .lancamentos { background: #9C27B0; }
+    .sair { background: #f44336; }
+  </style>
+</head>
+<body>
+
+  <div class="painel">
+    <h1>Painel de Controle</h1>
+
+    <button class="btn cadastro" onclick="location.href='cadastro.html'">Cadastro</button>
+    <button class="btn vendedores" onclick="location.href='vendedores.html'">Vendedores</button>
+    <button class="btn caixa" onclick="location.href='caixa.html'">Caixa</button>
+    <button class="btn lancamentos" onclick="location.href='lancamentos.html'">Lançamentos</button>
+    <button class="btn sair" onclick="location.href='index.html'">Sair</button>
+  </div>
+
+</body>
+</html>

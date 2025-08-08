@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Caixa - Controle</title>
+  <style>
+    body { font-family: Arial, sans-serif; display: flex; margin: 0; }
+    aside {
+      width: 250px;
+      background: #333;
+      color: white;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    aside h3 { margin-top: 0; }
+    aside button {
+      width: 100%;
+      margin: 5px 0;
+      padding: 10px;
+      background: #444;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    aside button:hover { background: #555; }
+
+    main {
+      flex: 1;
+      padding: 20px;
+      background: #f2f2f2;
+    }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+    hr { margin: 30px 0; }
+  </style>
+</head>
+<body>
+
+<aside>
+  <h3>Menu</h3>
+  <button onclick="gerarRelatorio('pdf')">Gerar Relatório (PDF)</button>
+  <button onclick="gerarRelatorio('jpg')">Gerar Relatório (JPG)</button>
+  <hr>
+  <button onclick="exportarBackup()">Exportar Backup</button>
+  <input type="file" onchange="restaurarBackup(event)" />
+  <hr>
+  <button onclick="prestarContas()">Prestar Contas</button>
+  <hr>
+  <button onclick="window.location.href='painel.html'">Voltar ao Painel</button>
+</aside>
+
+<main>
+  <div id="relatorioCompleto">
+    <h2>Resumo Financeiro (Caixa)</h2>
+    <p><strong>Saldo Anterior:</strong> R$ <span id="saldoAnterior">0.00</span></p>
+    <p><strong>Total Apurado:</strong> R$ <span id="totalApurado">0.00</span></p>
+    <p><strong>Despesas:</strong> R$ <span id="totalDespesas">0.00</span></p>
+    <p><strong>Saldo Final:</strong> R$ <span id="saldoFinal">0.00</span></p>
+
+    <h3>Resumo por Vendedor</h3>
+    <table>
+      <thead>
+        <tr><th>Vendedor</th><th>Vendeu</th><th>Apurado</th><th>Pago</th><th>Devendo</th></tr>
+      </thead>
+      <tbody id="tabelaVendedores"></tbody>
+    </table>
+
+    <h3>Despesas</h3>
+    <ul id="listaDespesas"></ul>
+
+    <h3>Lançamentos / Saques</h3>
+    <ul>
+      <li><strong>Benedito:</strong> R$ <span id="benedito"></span></li>
+      <li><strong>José:</strong> R$ <span id="jose"></span></li>
+      <li><strong>Pedro:</strong> R$ <span id="pedro"></span></li>
+    </ul>
+  </div>
+</main>
+
+<!-- Export libs -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script>
+  const saldoAnterior = parseFloat(localStorage.getItem('saldoAnterior') || '0');
+  const despesas = JSON.parse(localStorage.getItem('despesas') || '[]');
+  const vendedores = JSON.parse(localStorage.getItem('vendedores') || '[]');
+
+  const saqueBenedito = parseFloat(localStorage.getItem('saqueBenedito') || '0');
+  const saqueJose = parseFloat(localStorage.getItem('saqueJose') || '0');
+  const saquePedro = parseFloat(localStorage.getItem('saquePedro') || '0');
+
+  let totalApurado = 0;
+  let totalDespesas = 0;
+
+  const tbody = document.getElementById('tabelaVendedores');
+  vendedores.forEach(v => {
+    let vendeu = 0, apurado = 0, pago = 0;
+    v.vendas.forEach(venda => {
+      const vendidas = venda.pegou - venda.devolveu;
+      vendeu += vendidas;
+      apurado += vendidas * v.cotacao;
+      pago += venda.pago;
+    });
+    const devendo = apurado - pago;
+    totalApurado += apurado;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${v.nome}</td>
+      <td>${vendeu}</td>
+      <td>${apurado.toFixed(2)}</td>
+      <td>${pago.toFixed(2)}</td>
+      <td>${devendo.toFixed(2)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  const ulDespesas = document.getElementById('listaDespesas');
+  despesas.forEach(d => {
+    const li = document.createElement('li');
+    li.textContent = `${d.descricao}: R$ ${parseFloat(d.valor).toFixed(2)}`;
+    ulDespesas.appendChild(li);
+    totalDespesas += parseFloat(d.valor);
+  });
+
+  const saldoFinal = saldoAnterior + totalApurado - totalDespesas;
+
+  const benedito = (saldoFinal * 0.25) - saqueBenedito;
+  const jose = (saldoFinal * 0.25) - saqueJose;
+  const pedro = (totalApurado * 0.5) - saquePedro;
+
+  document.getElementById('saldoAnterior').textContent = saldoAnterior.toFixed(2);
+  document.getElementById('totalApurado').textContent = totalApurado.toFixed(2);
+  document.getElementById('totalDespesas').textContent = totalDespesas.toFixed(2);
+  document.getElementById('saldoFinal').textContent = saldoFinal.toFixed(2);
+  document.getElementById('benedito').textContent = benedito.toFixed(2);
+  document.getElementById('jose').textContent = jose.toFixed(2);
+  document.getElementById('pedro').textContent = pedro.toFixed(2);
+
+  // EXPORTAÇÃO
+  async function gerarRelatorio(tipo) {
+    const el = document.getElementById('relatorioCompleto');
+    const canvas = await html2canvas(el);
+    const dataUrl = canvas.toDataURL('image/png');
+
+    if (tipo === 'pdf') {
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = (canvas.height * pageWidth) / canvas.width;
+      pdf.addImage(dataUrl, 'PNG', 0, 0, pageWidth, pageHeight);
+      pdf.save('relatorio_geral.pdf');
+    } else {
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = 'relatorio_geral.jpg';
+      link.click();
+    }
+  }
+
+  // BACKUP
+  function exportarBackup() {
+    const dados = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const chave = localStorage.key(i);
+      dados[chave] = localStorage.getItem(chave);
+    }
+    const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "backup_sistema.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function restaurarBackup(event) {
+    const file = event.target.files[0];
+    if (!file) return alert("Selecione um arquivo válido.");
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const dados = JSON.parse(reader.result);
+        for (const chave in dados) {
+          localStorage.setItem(chave, dados[chave]);
+        }
+        alert("Backup restaurado com sucesso!");
+        location.reload();
+      } catch (e) {
+        alert("Erro ao restaurar backup.");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // PRESTAR CONTAS
+  function prestarContas() {
+    const senha = prompt("Digite a senha para prestar contas:");
+    if (senha !== "ADMIN123") return alert("Senha incorreta!");
+
+    localStorage.removeItem('despesas');
+    localStorage.removeItem('saldoAnterior');
+    localStorage.removeItem('saqueBenedito');
+    localStorage.removeItem('saqueJose');
+    localStorage.removeItem('saquePedro');
+
+    const vendedores = JSON.parse(localStorage.getItem('vendedores') || '[]');
+    const novos = vendedores.map(v => ({ nome: v.nome, cotacao: v.cotacao, vendas: [] }));
+    localStorage.setItem('vendedores', JSON.stringify(novos));
+
+    alert("Sistema zerado com sucesso! Somente os nomes foram mantidos.");
+    location.reload();
+  }
+</script>
+
+</body>
+</html>
